@@ -1,30 +1,35 @@
 import sys
 import requests
-import xml.etree.ElementTree as ET
 import json
 
 def fetch_jobs(job_title, location):
-    url = f"https://www.indeed.com/rss?q={job_title}&l={location}"
-    response = requests.get(url)
+    url = f"https://jobbank.gc.ca/api/jobs?keywords={job_title}&location={location}&distance=25&lang=en"
+    headers = {
+        "User-Agent": "GrootJobSearch/1.0"
+    }
+    
+    response = requests.get(url, headers=headers)
     if response.status_code != 200:
         print(f"Failed to fetch jobs: {response.status_code}")
         return []
     
-    root = ET.fromstring(response.content)
+    data = response.json()
     jobs = []
-    for item in root.findall('.//item'):
-        title = item.find('title').text
-        company = item.find('company').text
-        location = item.find('location').text
-        url = item.find('link').text
-        date = item.find('pubDate').text
+    for job in data['jobPostings']:
+        title = job['title']
+        company = job['employer_name']
+        location_city = job['location_city']
+        job_url = job['job_url']
+        date_posted = job['date_posted']
+        
         jobs.append({
             'title': title,
             'company': company,
-            'location': location,
-            'url': url,
-            'date': date
+            'location': location_city,
+            'url': job_url,
+            'date': date_posted
         })
+    
     return jobs
 
 def save_jobs_to_json(jobs):
