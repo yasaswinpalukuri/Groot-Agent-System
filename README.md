@@ -172,6 +172,21 @@ Senior recruiter prompt: ATS optimization, action verb enforcement, achievement 
 
 ---
 
+## Evaluation (Ragas)
+
+Evaluated using Ragas 0.1.21 with qwen2.5:7b as judge model and 
+nomic-embed-text for embeddings. Run on live ChromaDB collections.
+
+| Metric | Score | Notes |
+|--------|-------|-------|
+| Faithfulness | 1.000 | Answers stay within retrieved context — no hallucination |
+| Answer Relevancy | 0.676 | Answers address questions; 7B model verbosity affects score |
+| Overall | 0.838 | |
+
+Target on 32GB production hardware with reranker: 0.85+
+
+---
+
 ## What's Coming (Production 32GB PC)
 
 - Full 8-agent stack (+ Content, Finance agents)
