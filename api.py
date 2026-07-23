@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
+from pydantic import BaseModel
 from text_to_sql import query
 import sqlite3
 
@@ -6,7 +7,6 @@ app = FastAPI()
 
 DB_PATH = '/home/groot/code/tony/jobs.db'
 
-from pydantic import BaseModel
 
 class QueryRequest(BaseModel):
     question: str
