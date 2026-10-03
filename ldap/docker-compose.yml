@@ -1,0 +1,50 @@
+# Groot IAM — Phase 6: OpenLDAP directory
+#
+# Design notes (the WHY):
+# - Image pinned by DIGEST via .env, never by tag. Tags are mutable; digests are not.
+# - Bound to 127.0.0.1 only. LDAP is never exposed to the tailnet. Keycloak reaches
+#   it over the shared docker network as openldap:1389.
+# - Anonymous binds disabled: unauthenticated directory enumeration is classic recon.
+# - cn=config admin enabled so ACLs/TLS can be changed live via LDIF (6.3/6.4)
+#   instead of rebuilding the container.
+# - Non-standard container ports (1389/1636) because the image runs as non-root
+#   UID 1001, which cannot bind <1024.
+# - LDAPS (1636 -> 127.0.0.1:6636) is added in step 6.4 once a step-ca cert exists.
+
+services:
+  openldap:
+    image: ${LDAP_IMAGE:?LDAP_IMAGE must be set in .env (digest-pinned)}
+    container_name: groot-openldap
+    restart: unless-stopped
+    environment:
+      LDAP_ROOT: "dc=groot,dc=local"
+      LDAP_ADMIN_USERNAME: "admin"
+      LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD:?set in .env}
+      LDAP_CONFIG_ADMIN_ENABLED: "yes"
+      LDAP_CONFIG_ADMIN_USERNAME: "config"
+      LDAP_CONFIG_ADMIN_PASSWORD: ${LDAP_CONFIG_ADMIN_PASSWORD:?set in .env}
+      LDAP_ALLOW_ANON_BINDING: "no"
+      LDAP_CUSTOM_LDIF_DIR: "/ldifs"
+      LDAP_PORT_NUMBER: "1389"
+      LDAP_LOGLEVEL: "256"          # 256 = stats: logs connections, binds, searches
+    ports:
+      - "127.0.0.1:3389:1389"
+    volumes:
+      - ./ldifs:/ldifs:ro
+      - ldap-data:/bitnami/openldap
+    networks:
+      - groot-iam
+    healthcheck:
+      test: ["CMD-SHELL", "ldapsearch -x -H ldap://localhost:1389 -D \"cn=$${LDAP_ADMIN_USERNAME},$${LDAP_ROOT}\" -w \"$${LDAP_ADMIN_PASSWORD}\" -b \"$${LDAP_ROOT}\" -s base dn >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  ldap-data:
+    name: groot-ldap-data
+
+networks:
+  groot-iam:
+    external: true

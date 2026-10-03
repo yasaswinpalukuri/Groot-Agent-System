@@ -1,0 +1,44 @@
+# Groot IAM — OpenLDAP access control (applied to cn=config by apply-config.sh)
+#
+# Rules are evaluated in order; FIRST matching <what> wins, then the first
+# matching <who> within it. The rootdn (cn=admin) bypasses ACLs entirely.
+#
+# Idempotent: "replace: olcAccess" swaps the whole rule set, so re-applying is safe.
+#
+# KNOWN FRAGILITY: the target DN hard-codes {2}mdb, the index slapd assigned
+# in this image (verified via the cn=config search in step 6.3).
+#
+# LDIF continuation lines start with ONE space which is stripped; the second
+# space is kept as the word separator. Hence the two-space indent.
+
+dn: olcDatabase={2}mdb,cn=config
+changetype: modify
+replace: olcAccess
+# {0} Password hashes: NOBODY can read them, not even the owner.
+#   self =xw      -> may authenticate with it (x) and change it (w), never read it
+#   anonymous auth -> REQUIRED: a bind is evaluated as anonymous until it
+#                     succeeds; without this nobody could log in at all
+olcAccess: {0}to attrs=userPassword
+  by self =xw
+  by anonymous auth
+  by * none
+# {1} People: a user sees only their own entry; the two service accounts may
+#     read (not write) to resolve users. userPassword already handled by {0}.
+olcAccess: {1}to dn.subtree="ou=people,dc=groot,dc=local"
+  by self read
+  by dn.exact="cn=svc-keycloak,ou=services,dc=groot,dc=local" read
+  by dn.exact="cn=svc-gateway,ou=services,dc=groot,dc=local" read
+  by * none
+# {2} Groups = authorization data. Only the service accounts read it.
+#     Regular users can't enumerate who is an admin (recon value for attackers).
+olcAccess: {2}to dn.subtree="ou=groups,dc=groot,dc=local"
+  by dn.exact="cn=svc-keycloak,ou=services,dc=groot,dc=local" read
+  by dn.exact="cn=svc-gateway,ou=services,dc=groot,dc=local" read
+  by * none
+# {3} Service accounts can't enumerate each other.
+olcAccess: {3}to dn.subtree="ou=services,dc=groot,dc=local"
+  by self read
+  by * none
+# {4} Default deny for everything else (base entry, future OUs).
+olcAccess: {4}to *
+  by * none

@@ -1,0 +1,77 @@
+# Groot IAM — bootstrap DIT (Directory Information Tree)
+#
+# Deliberately contains NO userPassword attributes. Passwords are set afterwards
+# with ldappasswd (RFC 3062 Password Modify extended operation), so the SERVER
+# hashes them and no secret or hash ever lands in git.
+#
+# Layout:
+#   dc=groot,dc=local
+#   ├── ou=people    humans          (RDN: uid)
+#   ├── ou=services  bind accounts   (RDN: cn) one per consumer, least privilege
+#   └── ou=groups    groupOfNames    (RDN: cn) authorization lives here
+
+dn: dc=groot,dc=local
+objectClass: dcObject
+objectClass: organization
+dc: groot
+o: Groot Agent System
+
+dn: ou=people,dc=groot,dc=local
+objectClass: organizationalUnit
+ou: people
+description: Human identities
+
+dn: ou=services,dc=groot,dc=local
+objectClass: organizationalUnit
+ou: services
+description: Non-human bind accounts, one per consuming system
+
+dn: ou=groups,dc=groot,dc=local
+objectClass: organizationalUnit
+ou: groups
+description: Authorization groups (mapped to JWT groups claim by Keycloak)
+
+dn: uid=yasaswin,ou=people,dc=groot,dc=local
+objectClass: inetOrgPerson
+uid: yasaswin
+cn: Yasaswin Palukuri
+givenName: Yasaswin
+sn: Palukuri
+mail: yasaswin@groot.local
+
+# Negative-test identity: can authenticate, but is NOT an admin.
+# Proves the gateway authorizes on group membership, not on "logged in".
+dn: uid=tester,ou=people,dc=groot,dc=local
+objectClass: inetOrgPerson
+uid: tester
+cn: Test User
+givenName: Test
+sn: User
+mail: tester@groot.local
+
+# Separate service accounts per consumer: independent rotation and revocation,
+# and the slapd stats log shows WHICH system made each query.
+dn: cn=svc-keycloak,ou=services,dc=groot,dc=local
+objectClass: inetOrgPerson
+cn: svc-keycloak
+sn: service
+description: Keycloak user federation bind account (read-only)
+
+dn: cn=svc-gateway,ou=services,dc=groot,dc=local
+objectClass: inetOrgPerson
+cn: svc-gateway
+sn: service
+description: Groot gateway pkg/ldap lookup account (read-only)
+
+dn: cn=groot-admins,ou=groups,dc=groot,dc=local
+objectClass: groupOfNames
+cn: groot-admins
+description: Full admin on Groot agent platform
+member: uid=yasaswin,ou=people,dc=groot,dc=local
+
+dn: cn=groot-users,ou=groups,dc=groot,dc=local
+objectClass: groupOfNames
+cn: groot-users
+description: Standard users of Groot agent platform
+member: uid=yasaswin,ou=people,dc=groot,dc=local
+member: uid=tester,ou=people,dc=groot,dc=local
