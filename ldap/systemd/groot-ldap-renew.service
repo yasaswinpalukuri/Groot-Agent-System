@@ -1,0 +1,16 @@
+# Installed to /etc/systemd/system/. Source of truth: ldap/systemd/ in the repo.
+[Unit]
+Description=Groot IAM: renew OpenLDAP TLS cert via step-ca and hot-reload slapd
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# LIMITATION: groot is in the docker group, which is root-equivalent.
+# Proper least privilege needs rootless docker or a dedicated renewer identity.
+User=groot
+Group=groot
+ExecStart=/home/groot/code/groot-iam/ldap/renew-cert.sh
+NoNewPrivileges=yes
+PrivateTmp=yes

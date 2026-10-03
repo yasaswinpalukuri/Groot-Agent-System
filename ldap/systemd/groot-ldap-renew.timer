@@ -1,0 +1,13 @@
+# Installed to /etc/systemd/system/. Source of truth: ldap/systemd/ in the repo.
+[Unit]
+Description=Hourly OpenLDAP TLS renewal check (renews only in final 8h of a 24h cert)
+
+[Timer]
+OnCalendar=hourly
+# Spread load / avoid thundering herd if more renewers are added later.
+RandomizedDelaySec=5min
+# Run a missed check immediately after boot (Groot was off at the hour).
+Persistent=true
+
+[Install]
+WantedBy=timers.target
