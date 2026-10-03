@@ -1,0 +1,15 @@
+# Groot IAM — require encryption for every operation (applied by apply-config.sh)
+#
+# olcSecurity ssf=128: every operation needs a connection security strength of
+# at least 128 (AES-128 or better via TLS). Plaintext binds/searches get
+# result 13 (confidentialityRequired). The StartTLS request itself is still
+# allowed on plain 1389 (otherwise StartTLS could never start).
+#
+# Set on cn=config (global), so it also covers the config admin and rootdn.
+# We enforce overall ssf, not bind_ssf: simple binds have bind_ssf=0 by design
+# (that's the SASL layer); TLS provides the protection.
+
+dn: cn=config
+changetype: modify
+replace: olcSecurity
+olcSecurity: ssf=128

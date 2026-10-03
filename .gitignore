@@ -23,4 +23,3 @@ coverage.html
 *.key
 !.env.example
 ldap/tls/
-!.env.example

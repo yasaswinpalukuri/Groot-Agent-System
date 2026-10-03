@@ -1,0 +1,31 @@
+# Groot IAM — slapd TLS configuration (applied by apply-config.sh)
+#
+# ONE modify operation, four replaces separated by "-". slapd rebuilds its TLS
+# context after the whole operation, so cert and key change together. Changing
+# them in separate operations leaves a cert/key mismatch in between, which
+# slapd rejects.
+#
+# Paths are INSIDE the container: ./tls on the host is mounted at /tls (read-only).
+# The DIRECTORY is mounted (not single files) so atomic-rename renewals are
+# visible to the container.
+#
+# olcTLSProtocolMin 3.3 = TLS 1.2 (TLS wire version numbering; 3.4 = TLS 1.3).
+# olcTLSVerifyClient never = no client certs requested (mTLS/SASL EXTERNAL is
+# recorded as future work in LIMITATIONS.md).
+
+dn: cn=config
+changetype: modify
+replace: olcTLSCACertificateFile
+olcTLSCACertificateFile: /tls/ca.crt
+-
+replace: olcTLSCertificateFile
+olcTLSCertificateFile: /tls/ldap.crt
+-
+replace: olcTLSCertificateKeyFile
+olcTLSCertificateKeyFile: /tls/ldap.key
+-
+replace: olcTLSProtocolMin
+olcTLSProtocolMin: 3.3
+-
+replace: olcTLSVerifyClient
+olcTLSVerifyClient: never

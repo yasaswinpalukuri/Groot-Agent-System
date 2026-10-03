@@ -3,13 +3,19 @@
 # Design notes (the WHY):
 # - Image pinned by DIGEST via .env, never by tag. Tags are mutable; digests are not.
 # - Bound to 127.0.0.1 only. LDAP is never exposed to the tailnet. Keycloak reaches
-#   it over the shared docker network as openldap:1389.
+#   it over the shared docker network as openldap (StartTLS on 1389 / LDAPS on 1636).
 # - Anonymous binds disabled: unauthenticated directory enumeration is classic recon.
-# - cn=config admin enabled so ACLs/TLS can be changed live via LDIF (6.3/6.4)
-#   instead of rebuilding the container.
-# - Non-standard container ports (1389/1636) because the image runs as non-root
-#   UID 1001, which cannot bind <1024.
-# - LDAPS (1636 -> 127.0.0.1:6636) is added in step 6.4 once a step-ca cert exists.
+# - cn=config admin enabled so ACLs/TLS are managed as idempotent LDIFs
+#   (config/*.ldif via apply-config.sh) instead of image-init side effects.
+# - Non-standard container ports (1389/1636): image runs as non-root UID 1001.
+#
+# TLS (step 6.5):
+# - ./tls is mounted as a DIRECTORY (read-only). Renewal replaces files by atomic
+#   rename (new inode); single-file bind mounts would stay pinned to the old inode.
+# - TLS material is configured by config/20-tls.ldif, not by these env vars.
+# - LDAP_ENABLE_TLS is a staged toggle (default "no" from .env). It only adds the
+#   ldaps:// listener; flipping it on BEFORE 20-tls.ldif is applied would make
+#   slapd refuse to start (listener with no certificate).
 
 services:
   openldap:
@@ -26,16 +32,27 @@ services:
       LDAP_ALLOW_ANON_BINDING: "no"
       LDAP_CUSTOM_LDIF_DIR: "/ldifs"
       LDAP_PORT_NUMBER: "1389"
-      LDAP_LOGLEVEL: "256"          # 256 = stats: logs connections, binds, searches
+      LDAP_LOGLEVEL: "256"          # 256 = stats: connections, binds, searches, ssf
+      # --- TLS (staged; see header) ---
+      LDAP_ENABLE_TLS: ${LDAP_ENABLE_TLS:-no}
+      LDAP_LDAPS_PORT_NUMBER: "1636"
+      LDAP_TLS_CERT_FILE: "/tls/ldap.crt"
+      LDAP_TLS_KEY_FILE: "/tls/ldap.key"
+      LDAP_TLS_CA_FILE: "/tls/ca.crt"
     ports:
       - "127.0.0.1:3389:1389"
+      - "127.0.0.1:6636:1636"
     volumes:
       - ./ldifs:/ldifs:ro
+      - ./tls:/tls:ro
       - ldap-data:/bitnami/openldap
     networks:
       - groot-iam
     healthcheck:
-      test: ["CMD-SHELL", "ldapsearch -x -H ldap://localhost:1389 -D \"cn=$${LDAP_ADMIN_USERNAME},$${LDAP_ROOT}\" -w \"$${LDAP_ADMIN_PASSWORD}\" -b \"$${LDAP_ROOT}\" -s base dn >/dev/null 2>&1 || exit 1"]
+      # LDAPS admin bind, verifying the server cert against our root (/tls/ca.crt).
+      # 127.0.0.1 (an IP SAN), NOT localhost: libldap substitutes the machine
+      # hostname for 'localhost' when checking the cert, which would fail.
+      test: ["CMD-SHELL", "LDAPTLS_CACERT=/tls/ca.crt ldapsearch -x -H ldaps://127.0.0.1:1636 -D \"cn=$${LDAP_ADMIN_USERNAME},$${LDAP_ROOT}\" -w \"$${LDAP_ADMIN_PASSWORD}\" -b \"$${LDAP_ROOT}\" -s base dn >/dev/null 2>&1 || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 10
