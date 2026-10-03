@@ -1,4 +1,22 @@
-.aider*
-__pycache__/
-*.pyc
-jobs_output.json
+# Go
+*.exe
+*.test
+*.out
+/vendor/
+/bin/
+
+# Secrets — never commit these
+*.pem
+*.key
+*.p12
+*.pfx
+.env
+.env.*
+secrets/
+
+# Test artifacts
+coverage.out
+coverage.html
+
+# OS
+.DS_Store
