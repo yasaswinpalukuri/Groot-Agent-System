@@ -1,0 +1,52 @@
+# ~/code/groot-iam/pki/docker-compose.yml
+#
+# step-ca — Groot's private Certificate Authority
+#
+# WHY step-ca over raw openssl scripts?
+# step-ca provides an ACME server, automatic cert renewal via step CLI,
+# and a clean REST API. openssl scripts are fragile shell — one wrong flag
+# and you silently create a cert without the SANs you intended.
+# step-ca also has built-in provisioners (JWK, ACME, X5C) that simplify
+# cert issuance for different workloads.
+#
+# WHY a private CA instead of Let's Encrypt?
+# Let's Encrypt requires a public DNS name. Groot is internal, reached over
+# Tailscale. A private CA issues certs trusted within Groot's network for
+# mTLS between gateway and agent_service. Limitation documented in
+# docs/learn/LIMITATIONS.md: certs are not trusted by browsers without
+# installing the root CA.
+#
+# WHY 127.0.0.1:9000?
+# step-ca only needs to be reachable by services on the same host.
+# Binding to localhost prevents external access.
+
+services:
+  step-ca:
+    image: smallstep/step-ca:0.26.1
+    container_name: groot-step-ca
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9000:9000"
+    volumes:
+      - step_data:/home/step
+    networks:
+      - groot-iam
+    environment:
+      DOCKER_STEPCA_INIT_NAME: "Groot CA"
+      DOCKER_STEPCA_INIT_DNS_NAMES: "localhost,127.0.0.1,groot-step-ca"
+      DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT: "true"
+      DOCKER_STEPCA_INIT_PASSWORD: ${STEP_CA_PASSWORD}
+    healthcheck:
+      test: ["CMD", "step", "ca", "health", "--ca-url", "https://localhost:9000", "--root", "/home/step/certs/root_ca.crt"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  step_data:
+
+networks:
+  groot-iam:
+    name: groot-iam
+    external: true
