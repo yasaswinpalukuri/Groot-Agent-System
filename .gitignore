@@ -22,3 +22,5 @@ coverage.html
 .DS_Store
 *.key
 !.env.example
+ldap/tls/
+!.env.example
