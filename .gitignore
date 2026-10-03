@@ -21,3 +21,4 @@ coverage.html
 # OS
 .DS_Store
 *.key
+!.env.example
