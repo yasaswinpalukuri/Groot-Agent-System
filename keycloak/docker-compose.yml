@@ -3,18 +3,27 @@
 # Keycloak 24.0.5 — OIDC/SAML Identity Provider for Groot
 #
 # WHY start-dev?
-# start-dev disables the HTTPS requirement for the admin console and uses an
-# embedded H2 database stored in the keycloak_data volume. This is NOT
-# production-grade. Phase 4 adds TLS. We document this in LIMITATIONS.md.
+# start-dev serves plain HTTP and uses an embedded H2 database stored in the
+# keycloak_data volume. NOT production-grade: Keycloak itself still serves
+# HTTP (bound to loopback only). Recorded in docs/learn/LIMITATIONS.md.
 #
 # WHY 127.0.0.1:8090 not 0.0.0.0:8090?
 # Binding to localhost prevents Keycloak from being reachable from outside
-# the server. The IAM gateway (same host or same Docker network) can still
-# reach it via localhost or the groot-iam network. Defense in depth.
+# the server. Defense in depth.
 #
 # WHY a named network groot-iam?
-# The IAM gateway (Phase 5) will join this same network to talk to Keycloak
-# without exposing Keycloak on the host network.
+# The IAM gateway and OpenLDAP join this network; Keycloak reaches LDAP as
+# openldap:1636 without either being exposed on the host network.
+#
+# WHY KC_TRUSTSTORE_PATHS (Phase 6)?
+# Keycloak is Java: it ignores the OS CA bundle and env vars like LDAPTLS_CACERT.
+# We add Groot's ROOT CA (not slapd's leaf) so slapd's 24h cert can rotate
+# freely without Keycloak changes. Added on top of the JVM default trust.
+#
+# WHY KC_TLS_HOSTNAME_VERIFIER=STRICT?
+# Default WILDCARD accepts *.domain certs; ours have none, so STRICT is free
+# hardening for outbound HTTPS/SMTP. LDAPS hostname checking is done by the
+# JDK LDAP client and is verified separately by a negative test (step 6.6b).
 
 services:
   keycloak:
@@ -28,18 +37,34 @@ services:
       KC_HTTP_PORT: 8080
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_TRUSTSTORE_PATHS: /opt/keycloak/conf/truststores/groot-root-ca.crt
+      KC_TLS_HOSTNAME_VERIFIER: STRICT
+      # Build-time option; start-dev auto-rebuilds. With `start` you must run kc.sh build.
+      KC_HEALTH_ENABLED: "true"
     ports:
       - "127.0.0.1:8090:8080"
     volumes:
       - keycloak_data:/opt/keycloak/data
+      - ../certs/root_ca.crt:/opt/keycloak/conf/truststores/groot-root-ca.crt:ro
     networks:
       - groot-iam
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/ready || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 90s
+      # The KC 24 image ships NO curl (the old curl check failed on every run since
+      # Phase 2). Pure-bash /dev/tcp: raw HTTP GET, judged by the STATUS LINE (200),
+      # not by grepping "UP" in the body (a 503 DOWN body can still contain "UP"
+      # for individual checks). KC 24 serves /health on 8080; KC 25+ moves it to 9000.
+      test:
+        - CMD
+        - bash
+        - -c
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/8080 &&
+          printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          head -n1 <&3 | grep -q ' 200 '
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 60s
 
 volumes:
   keycloak_data:
