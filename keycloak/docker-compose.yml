@@ -1,0 +1,50 @@
+# ~/code/groot-iam/keycloak/docker-compose.yml
+#
+# Keycloak 24.0.5 — OIDC/SAML Identity Provider for Groot
+#
+# WHY start-dev?
+# start-dev disables the HTTPS requirement for the admin console and uses an
+# embedded H2 database stored in the keycloak_data volume. This is NOT
+# production-grade. Phase 4 adds TLS. We document this in LIMITATIONS.md.
+#
+# WHY 127.0.0.1:8090 not 0.0.0.0:8090?
+# Binding to localhost prevents Keycloak from being reachable from outside
+# the server. The IAM gateway (same host or same Docker network) can still
+# reach it via localhost or the groot-iam network. Defense in depth.
+#
+# WHY a named network groot-iam?
+# The IAM gateway (Phase 5) will join this same network to talk to Keycloak
+# without exposing Keycloak on the host network.
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.5
+    container_name: groot-keycloak
+    command: start-dev
+    restart: unless-stopped
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD}
+      KC_HTTP_PORT: 8080
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+    ports:
+      - "127.0.0.1:8090:8080"
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+    networks:
+      - groot-iam
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+volumes:
+  keycloak_data:
+
+networks:
+  groot-iam:
+    name: groot-iam
+    driver: bridge
