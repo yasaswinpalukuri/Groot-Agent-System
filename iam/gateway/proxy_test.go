@@ -109,7 +109,7 @@ func makeToken(t *testing.T, opts tokenOpts) string {
 	}
 	roles := opts.roles
 	if roles == nil {
-		roles = []string{"agent:groot"}
+		roles = []string{"agent_access"}
 	}
 
 	claims := jwt.MapClaims{
@@ -139,6 +139,7 @@ func newTestProxy(t *testing.T, backendURL, jwksURL string) *gw.Proxy {
 		AllowedIssuers:   []string{testIssuer},
 		AllowedAudiences: []string{testAudience},
 		MaxBodyBytes:     1024, // 1KB for tests
+		Routes:           grootTestRoutes,
 	})
 	if err != nil {
 		t.Fatalf("New proxy: %v", err)
@@ -325,7 +326,7 @@ func TestValidTokenForwardedToBackend(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/api/agents", nil)
 	req.Header.Set("Authorization", "Bearer "+makeToken(t, tokenOpts{
-		roles:   []string{"agent:groot", "agent:einstein"},
+		roles:   []string{"agent_access", "agent:einstein"},
 		subject: "yasaswin-sub",
 	}))
 
@@ -345,8 +346,8 @@ func TestValidTokenForwardedToBackend(t *testing.T) {
 		t.Errorf("X-Verified-User = %q, want %q", h.Get("X-Verified-User"), "yasaswin-sub")
 	}
 	roles := h.Get("X-Verified-Roles")
-	if !strings.Contains(roles, "agent:groot") {
-		t.Errorf("X-Verified-Roles %q missing agent:groot", roles)
+	if !strings.Contains(roles, "agent_access") {
+		t.Errorf("X-Verified-Roles %q missing agent_access", roles)
 	}
 	if !strings.Contains(roles, "agent:einstein") {
 		t.Errorf("X-Verified-Roles %q missing agent:einstein", roles)
