@@ -2,3 +2,9 @@
 __pycache__/
 *.pyc
 jobs_output.json
+node_modules/
+dist/
+.env*
+__pycache__/
+*.db
+jobs_output.json
