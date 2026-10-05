@@ -1,0 +1,4 @@
+{
+  "sessions": { "sessions": [{ "id": "sess_existing", "name": "Earlier conversation" }] },
+  "replyTokens": ["Hello", " from", " Groot", "."]
+}
