@@ -28,7 +28,7 @@ const PRIORITY_COLOR = { 0: '#F85149', 1: '#D29922', 2: '#58A6FF', 3: '#8B949E' 
 
 function StatCard({ icon: Icon, label, value, color }) {
   return (
-    <div style={{ background: '#161B22', border: '1px solid #30363D',
+    <div role="group" aria-label={label} style={{ background: '#161B22', border: '1px solid #30363D',
       borderRadius: '8px', padding: '16px', flex: 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
         <Icon size={14} color="#8B949E" />
