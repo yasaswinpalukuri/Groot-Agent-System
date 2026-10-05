@@ -1,12 +1,16 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 from text_to_sql import query
 import sqlite3
+import requests
+import time
+from datetime import datetime
+import os
+from evaluator import evaluate
 
 app = FastAPI()
 
 DB_PATH = '/home/groot/code/tony/jobs.db'
-
 
 class QueryRequest(BaseModel):
     question: str
@@ -31,6 +35,24 @@ async def get_jobs():
     conn.close()
     return results
 
+@app.post("/evaluate")
+async def post_evaluate(request: Request):
+    data = await request.json()
+    model = data.get("model", "qwen2.5-coder:7b")
+    base_url = data.get("base_url", "http://localhost:8003")
+    
+    summary = evaluate(model, base_url)
+    return summary
+
+@app.get("/reports")
+async def get_reports():
+    reports_dir = "reports"
+    if not os.path.exists(reports_dir):
+        os.makedirs(reports_dir)
+    
+    report_files = [f for f in os.listdir(reports_dir) if f.endswith(".md")]
+    return {"reports": report_files}
+
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=8002)
+    uvicorn.run(app, host='0.0.0.0', port=8003)
