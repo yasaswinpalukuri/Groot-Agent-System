@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
-import { ExternalLink, Clock, CheckCircle, XCircle, RefreshCw } from 'lucide-react'
+import { ExternalLink, RefreshCw } from 'lucide-react'
+import { getJobTracker, updateJobStatus, JOB_STATUSES } from '../api/client'
+import type { JobRecord, JobStatus } from '../api/client'
 
-const API = 'http://groot:8000'
+type Filter = 'All' | JobStatus
 
-const STATUSES = ['All', 'interested', 'applied', 'contacted', 'interview', 'offer', 'rejected']
+const STATUSES: readonly Filter[] = ['All', ...JOB_STATUSES]
 
-function statusColor(s) {
+function statusColor(s: JobStatus) {
   if (s === 'offer')     return { bg: '#1C2A1C', color: '#3FB950' }
   if (s === 'interview') return { bg: '#1C2F4A', color: '#58A6FF' }
   if (s === 'applied')   return { bg: '#2D2208', color: '#D29922' }
@@ -14,24 +16,23 @@ function statusColor(s) {
   return { bg: '#21262D', color: '#6E7681' }
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—'
   try { return new Date(dateStr).toISOString().slice(0, 10) }
   catch { return dateStr.slice(0, 10) }
 }
 
 export default function Approvals() {
-  const [jobs, setJobs]       = useState([])
+  const [jobs, setJobs]       = useState<JobRecord[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter]   = useState('All')
-  const [error, setError]     = useState(null)
+  const [filter, setFilter]   = useState<Filter>('All')
+  const [error, setError]     = useState<string | null>(null)
 
   const fetchTracker = async () => {
     setLoading(true)
     setError(null)
     try {
-      const r = await fetch(`${API}/jobs/tracker`)
-      const d = await r.json()
+      const d = await getJobTracker()
       setJobs(d.jobs || [])
     } catch {
       setError('Could not reach agent service')
@@ -40,13 +41,9 @@ export default function Approvals() {
     }
   }
 
-  const updateStatus = async (jobId, newStatus) => {
+  const updateStatus = async (jobId: JobRecord['id'], newStatus: JobStatus) => {
     try {
-      await fetch(`${API}/jobs/tracker/${jobId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      })
+      await updateJobStatus(jobId, newStatus)
       fetchTracker()
     } catch {}
   }
@@ -144,10 +141,10 @@ export default function Approvals() {
           </div>
         )}
 
-        {!loading && filtered.map((job, i) => {
+        {!loading && filtered.map(job => {
           const sc = statusColor(job.status)
           return (
-            <div key={i} style={{ display: 'grid',
+            <div key={job.id} style={{ display: 'grid',
               gridTemplateColumns: '1.5fr 1.5fr 1fr 120px 110px 100px 32px',
               padding: '12px 16px', borderBottom: '1px solid #21262D',
               alignItems: 'center' }}>
@@ -166,14 +163,15 @@ export default function Approvals() {
                 {job.status}
               </span>
               <select
-                onChange={e => updateStatus(job.id, e.target.value)}
+                aria-label={`Update status for ${job.company}`}
+                onChange={e => updateStatus(job.id, e.target.value as JobStatus)}
                 defaultValue={job.status}
                 style={{
                   background: '#21262D', border: '1px solid #30363D',
                   borderRadius: '4px', color: '#8B949E',
                   fontSize: '10px', padding: '3px 4px', cursor: 'pointer',
                 }}>
-                {STATUSES.filter(s => s !== 'All').map(s => (
+                {JOB_STATUSES.map(s => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>

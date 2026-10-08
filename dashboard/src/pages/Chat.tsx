@@ -1,9 +1,19 @@
 import { useState, useRef, useEffect } from 'react'
+import type { ChangeEvent, MouseEvent } from 'react'
 import { Send, Plus, Trash2, MessageSquare, Paperclip, X } from 'lucide-react'
+import {
+  listChatSessions, getChatSession, deleteChatSession, uploadChatFile, streamChat,
+} from '../api/client'
+import type { ChatMessage, ChatSession } from '../api/client'
 
-const API = 'http://groot:8000'
+interface Agent {
+  id: string
+  label: string
+  model: string
+  greeting: string
+}
 
-const AGENTS = [
+const AGENTS: Agent[] = [
   { id: 'groot',      label: 'Groot',    model: 'qwen2.5:7b',      greeting: 'I am Groot. What do you need?' },
   { id: 'einstein',   label: 'Einstein', model: 'deepseek-r1:14b',  greeting: 'Einstein here. What shall we research?' },
   { id: 'tony',       label: 'Tony',     model: 'qwen2.5-coder:7b', greeting: 'Tony online. Show me the code.' },
@@ -16,18 +26,26 @@ function genSessionId() {
 
 export default function Chat() {
   const [agent, setAgent]         = useState(AGENTS[0])
-  const [sessions, setSessions]   = useState([])
+  const [sessions, setSessions]   = useState<ChatSession[]>([])
   const [sessionId, setSessionId] = useState(() => genSessionId())
   const [sessionName, setSessionName] = useState('')
-  const [messages, setMessages]   = useState([
+  const [messages, setMessages]   = useState<ChatMessage[]>([
     { role: 'assistant', content: AGENTS[0].greeting, model: AGENTS[0].model }
   ])
   const [input, setInput]         = useState('')
   const [streaming, setStreaming] = useState(false)
-  const [file, setFile]           = useState(null)
+  const [file, setFile]           = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
-  const fileRef = useRef(null)
-  const bottomRef = useRef(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  // Replace the content of the last (in-progress assistant) message without mutating state.
+  const updateLast = (next: (prev: string) => string) =>
+    setMessages(m => {
+      const u = [...m]
+      u[u.length - 1] = { ...u[u.length - 1], content: next(u[u.length - 1].content) }
+      return u
+    })
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -41,19 +59,17 @@ export default function Chat() {
 
   const loadSessions = async () => {
     try {
-      const r = await fetch(`${API}/chat/sessions`)
-      const d = await r.json()
+      const d = await listChatSessions()
       setSessions(d.sessions || [])
     } catch {}
   }
 
-  const loadSession = async (sess) => {
+  const loadSession = async (sess: ChatSession) => {
     try {
-      const r = await fetch(`${API}/chat/sessions/${sess.id}`)
-      const d = await r.json()
+      const d = await getChatSession(sess.id)
       setSessionId(sess.id)
       setSessionName(sess.name)
-      const msgs = (d.messages || []).map(m => ({
+      const msgs: ChatMessage[] = (d.messages || []).map(m => ({
         role:    m.role,
         content: m.content,
         model:   m.model || agent.model,
@@ -70,32 +86,32 @@ export default function Chat() {
     loadSessions()
   }
 
-  const deleteSession = async (sess, e) => {
+  const deleteSession = async (sess: ChatSession, e: MouseEvent) => {
     e.stopPropagation()
     try {
-      await fetch(`${API}/chat/sessions/${sess.id}`, { method: 'DELETE' })
+      await deleteChatSession(sess.id)
       loadSessions()
       if (sess.id === sessionId) newChat()
     } catch {}
   }
 
-  const switchAgent = (a) => {
+  const switchAgent = (a: Agent) => {
     if (!streaming) {
       setAgent(a)
       setMessages([{ role: 'assistant', content: a.greeting, model: a.model }])
     }
   }
 
-  const handleFile = (e) => {
-    const f = e.target.files[0]
+  const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
     if (f) setFile(f)
   }
 
   const uploadFile = async () => {
     if (!file) return
     setUploading(true)
-    const userMsg   = { role: 'user',      content: `📎 ${file.name}${input ? ' — ' + input : ''}`, model: agent.model }
-    const assistMsg = { role: 'assistant', content: '', model: agent.model }
+    const userMsg: ChatMessage   = { role: 'user',      content: `📎 ${file.name}${input ? ' — ' + input : ''}`, model: agent.model }
+    const assistMsg: ChatMessage = { role: 'assistant', content: '', model: agent.model }
     setMessages(m => [...m, userMsg, assistMsg])
     const q = input
     setInput('')
@@ -108,20 +124,11 @@ export default function Chat() {
     form.append('session_id', sessionId)
 
     try {
-      const r = await fetch(`${API}/chat/upload`, { method: 'POST', body: form })
-      const d = await r.json()
-      setMessages(m => {
-        const u = [...m]
-        u[u.length - 1] = { ...u[u.length - 1], content: d.response || 'No response' }
-        return u
-      })
+      const d = await uploadChatFile(form)
+      updateLast(() => d.response || 'No response')
       loadSessions()
     } catch {
-      setMessages(m => {
-        const u = [...m]
-        u[u.length - 1].content = 'Error processing file.'
-        return u
-      })
+      updateLast(() => 'Error processing file.')
     } finally {
       setUploading(false)
     }
@@ -129,8 +136,8 @@ export default function Chat() {
 
   const send = async () => {
     if (!input.trim() || streaming) return
-    const userMsg   = { role: 'user', content: input }
-    const assistMsg = { role: 'assistant', content: '', model: agent.model }
+    const userMsg: ChatMessage   = { role: 'user', content: input }
+    const assistMsg: ChatMessage = { role: 'assistant', content: '', model: agent.model }
     const isFirst   = messages.length <= 1
     const name      = isFirst ? input.slice(0, 40) : sessionName
 
@@ -145,46 +152,18 @@ export default function Chat() {
     history.push({ role: 'user', content: input })
 
     try {
-      const res = await fetch(`${API}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      await streamChat(
+        {
           message:      input,
           model:        agent.model,
           history,
           session_id:   sessionId,
           session_name: name,
-        }),
-      })
-      const reader  = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer    = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop()
-        for (const line of lines) {
-          if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-            try {
-              const { token } = JSON.parse(line.slice(6))
-              setMessages(m => {
-                const u = [...m]
-                u[u.length - 1] = { ...u[u.length - 1], content: u[u.length - 1].content + token }
-                return u
-              })
-            } catch {}
-          }
-        }
-      }
+        },
+        token => updateLast(prev => prev + token),
+      )
     } catch {
-      setMessages(m => {
-        const u = [...m]
-        u[u.length - 1].content = 'Error reaching agent service.'
-        return u
-      })
+      updateLast(() => 'Error reaching agent service.')
     } finally {
       setStreaming(false)
       loadSessions()
@@ -244,7 +223,7 @@ export default function Chat() {
                 display: 'flex', alignItems: 'center', gap: '6px',
                 padding: '7px 8px', borderRadius: '6px', cursor: 'pointer',
                 background: sess.id === sessionId ? '#30363D' : 'transparent',
-                marginBottom: '2px', group: true,
+                marginBottom: '2px',
               }}
               onMouseEnter={e => e.currentTarget.style.background = '#1A1F27'}
               onMouseLeave={e => e.currentTarget.style.background = sess.id === sessionId ? '#21262D' : 'transparent'}
@@ -255,7 +234,7 @@ export default function Chat() {
                 textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {sess.name || 'New Conversation'}
               </span>
-              <button onClick={e => deleteSession(sess, e)} style={{
+              <button aria-label="Delete conversation" onClick={e => deleteSession(sess, e)} style={{
                 background: 'none', border: 'none', cursor: 'pointer',
                 padding: '2px', opacity: 0.5, flexShrink: 0,
               }}>
@@ -341,10 +320,11 @@ export default function Chat() {
               outline: 'none', resize: 'none', overflow: 'hidden',
               lineHeight: '1.5', maxHeight: '120px', overflowY: 'auto' }}
             onInput={e => {
-              e.target.style.height = 'auto'
-              e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+              e.currentTarget.style.height = 'auto'
+              e.currentTarget.style.height = Math.min(e.currentTarget.scrollHeight, 120) + 'px'
             }} />
           <button
+            aria-label="Send message"
             onClick={file ? uploadFile : send}
             disabled={streaming || uploading || (!input.trim() && !file)}
             style={{
