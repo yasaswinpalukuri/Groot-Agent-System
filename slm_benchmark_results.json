@@ -1,0 +1,94 @@
+{
+  "benchmark_date": "2026-10-06T18:23:26.090570",
+  "host": "Lenovo M720Q \u00b7 Ubuntu 22.04 \u00b7 x86_64",
+  "pi4_limits": {
+    "cpu_cores": 4,
+    "memory_gb": 4,
+    "note": "Emulated via Docker --cpus=4 --memory=4g on x86_64. Tokens/sec will be higher than real ARM Cortex-A72 (Pi 4). RAM and thermal behaviour is representative."
+  },
+  "ollama_version": "0.31.2",
+  "models": [
+    {
+      "model": "llama3.2:1b",
+      "prompts_run": 3,
+      "server_tps_mean": 21.3,
+      "server_tps_min": 20.6,
+      "server_tps_max": 21.8,
+      "wall_tps_mean": 19.7,
+      "peak_ram_delta_mb": 16,
+      "peak_temp_c": 67.0,
+      "raw": [
+        {
+          "prompt_tokens": 36,
+          "output_tokens": 92,
+          "wall_elapsed_s": 4.77,
+          "server_tps": 21.53,
+          "wall_tps": 19.3,
+          "ram_used_mb": 14615,
+          "temp_c": 61.0
+        },
+        {
+          "prompt_tokens": 35,
+          "output_tokens": 150,
+          "wall_elapsed_s": 7.75,
+          "server_tps": 20.58,
+          "wall_tps": 19.36,
+          "ram_used_mb": 14616,
+          "temp_c": 65.0
+        },
+        {
+          "prompt_tokens": 38,
+          "output_tokens": 150,
+          "wall_elapsed_s": 7.36,
+          "server_tps": 21.76,
+          "wall_tps": 20.39,
+          "ram_used_mb": 14610,
+          "temp_c": 67.0
+        }
+      ],
+      "params": "1B",
+      "family": "Llama 3.2"
+    },
+    {
+      "model": "qwen2.5:0.5b",
+      "prompts_run": 3,
+      "server_tps_mean": 54.9,
+      "server_tps_min": 54.1,
+      "server_tps_max": 56.0,
+      "wall_tps_mean": 45.2,
+      "peak_ram_delta_mb": -30,
+      "peak_temp_c": 68.0,
+      "raw": [
+        {
+          "prompt_tokens": 40,
+          "output_tokens": 38,
+          "wall_elapsed_s": 1.03,
+          "server_tps": 54.07,
+          "wall_tps": 36.91,
+          "ram_used_mb": 13628,
+          "temp_c": 64.0
+        },
+        {
+          "prompt_tokens": 39,
+          "output_tokens": 150,
+          "wall_elapsed_s": 3.07,
+          "server_tps": 54.6,
+          "wall_tps": 48.86,
+          "ram_used_mb": 13637,
+          "temp_c": 66.0
+        },
+        {
+          "prompt_tokens": 42,
+          "output_tokens": 150,
+          "wall_elapsed_s": 3.01,
+          "server_tps": 56.05,
+          "wall_tps": 49.84,
+          "ram_used_mb": 13640,
+          "temp_c": 68.0
+        }
+      ],
+      "params": "0.5B",
+      "family": "Qwen 2.5"
+    }
+  ]
+}
