@@ -1,0 +1,7 @@
+{
+  "jobs": [
+    { "id": 1, "company": "Acme Corp",  "role": "Data Engineer",       "location": "Toronto, ON",  "date": "2026-09-28T00:00:00Z", "status": "applied",    "url": "https://example.com/jobs/1" },
+    { "id": 2, "company": "Globex",     "role": "Full-Stack Developer", "location": "Remote",       "date": "2026-09-30T00:00:00Z", "status": "interview",  "url": "https://example.com/jobs/2" },
+    { "id": 3, "company": "Initech",    "role": "ML Engineer",          "location": "Montreal, QC", "date": null,                   "status": "interested", "url": "https://example.com/jobs/3" }
+  ]
+}

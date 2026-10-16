@@ -1,0 +1,13 @@
+{
+  "health": { "status": "ok", "model": "qwen2.5-coder:7b" },
+  "schedulerStatus": { "status": "busy", "queue_depth": 2 },
+  "schedulerQueue": {
+    "queue_depth": 2,
+    "current_task": null,
+    "tasks": [
+      { "agent": "Einstein", "task": "Research vector database trade-offs for RAG", "priority": 1 },
+      { "agent": "Tony", "task": "Review the dashboard TypeScript migration PR", "priority": 2 }
+    ]
+  },
+  "live": { "ram_used_pct": 42, "queue_depth": 2 }
+}
